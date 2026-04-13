@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통합 채널 판매 손익 시뮬레이션</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f1e;display:flex;justify-content:center;padding:24px;min-height:100vh}
+.w{background:#16162a;color:#dde;padding:14px;border-radius:10px;font-family:sans-serif;font-size:12px;width:100%;max-width:820px}
+.top-bar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.top-title{font-size:13px;font-weight:500;color:#b0c4e8;line-height:1.5}
+.kpis{display:flex;gap:18px;flex-wrap:wrap}
+.kpi-item{text-align:right}
+.kpi-label{font-size:10px;color:#778;margin-bottom:2px}
+.kpi-val{font-size:14px;font-weight:500;color:#dde}
+.kpi-val.accent{color:#7eb8f7}
+table{width:100%;border-collapse:collapse;margin-bottom:12px}
+th{background:#1e1e38;color:#889;font-weight:400;padding:6px 8px;text-align:center;font-size:11px;border-bottom:1px solid #2a2a44}
+td{padding:5px 8px;text-align:center;border-bottom:1px solid #21213a;color:#ccd;font-size:11px}
+td.lbl{text-align:left;color:#aab;font-weight:400}
+tr.total-row td{background:#1e1e38;font-weight:500;color:#eef;border-top:1px solid #3a3a58}
+.legend{display:flex;gap:12px;margin-bottom:6px;font-size:11px;color:#889}
+.dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px}
+.chart-wrap{position:relative;width:100%;height:200px;margin-bottom:14px}
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px 20px}
+.ctrl-row{display:flex;align-items:center;gap:6px}
+.ctrl-lbl{font-size:11px;color:#889;min-width:114px;flex-shrink:0}
+.ctrl-row input[type=range]{flex:1;accent-color:#7eb8f7;height:3px}
+.cval{background:#1e1e38;border-radius:3px;padding:2px 7px;color:#dde;font-size:11px;font-weight:500;min-width:42px;text-align:center}
+.reset-btn{margin-top:10px;width:100%;padding:7px;background:#1e1e38;border:1px solid #3a3a58;border-radius:5px;color:#aab;font-size:11px;cursor:pointer}
+.reset-btn:hover{background:#252545}
+</style>
+</head>
+<body>
+<div class="w">
+  <div class="top-bar">
+    <div class="top-title">30병 세트 기준 통합 채널 판매 손익<br>시뮬레이션</div>
+    <div class="kpis">
+      <div class="kpi-item"><div class="kpi-label">총 매출액</div><div class="kpi-val" id="kpi-rev">-</div></div>
+      <div class="kpi-item"><div class="kpi-label">총 순이익</div><div class="kpi-val" id="kpi-profit">-</div></div>
+      <div class="kpi-item"><div class="kpi-label">평균 이익률</div><div class="kpi-val accent" id="kpi-margin">-</div></div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>채널</th><th>세트 수</th><th>매출액 (KRW)</th><th>총 비용 (KRW)</th><th>순이익 (KRW)</th><th>이익률 (%)</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#5a9fd4"></span>매출액</span>
+    <span><span class="dot" style="background:#4aaa72"></span>순이익</span>
+  </div>
+  <div class="chart-wrap"><canvas id="ch" role="img" aria-label="채널별 매출액과 순이익 막대 차트"></canvas></div>
+
+  <div class="ctrl-grid">
+    <!-- 1줄 -->
+    <div class="ctrl-row"><span class="ctrl-lbl">총 생산량 (병)</span><input type="range" id="s-prod" min="10000" max="300000" step="5000" value="100000"><span class="cval" id="v-prod">100000</span></div>
+    <div class="ctrl-row"><span class="ctrl-lbl">환율 (KRW/CNY)</span><input type="range" id="s-fx" min="150" max="300" step="1" value="210"><span class="cval" id="v-fx">210</span></div>
+    <!-- 2줄 -->
+    <div class="ctrl-row"><span class="ctrl-lbl">개당 원가 (KRW)</span><input type="range" id="s-cogs" min="100" max="1000" step="10" value="400"><span class="cval" id="v-cogs">400</span></div>
+    <div class="ctrl-row"><span class="ctrl-lbl">세트 구성 (병/세트)</span><input type="range" id="s-set" min="10" max="60" step="10" value="30"><span class="cval" id="v-set">30</span></div>
+    <!-- 3줄 -->
+    <div class="ctrl-row"><span class="ctrl-lbl">왕홍 수수료 (%)</span><input type="range" id="s-comm" min="20" max="80" step="1" value="60"><span class="cval" id="v-comm">60</span></div>
+    <div class="ctrl-row"><span class="ctrl-lbl">티몰 마케팅 (%)</span><input type="range" id="s-tmktg" min="0" max="40" step="1" value="20"><span class="cval" id="v-tmktg">20</span></div>
+    <!-- 4줄 -->
+    <div class="ctrl-row"><span class="ctrl-lbl">B2C 내 왕홍 비중 (%)</span><input type="range" id="s-wh" min="0" max="100" step="1" value="80"><span class="cval" id="v-wh">80</span></div>
+    <div class="ctrl-row"><span class="ctrl-lbl">B2C 내 티몰 비중 (%)</span><input type="range" id="s-tmall" min="0" max="100" step="1" value="20"><span class="cval" id="v-tmall">20</span></div>
+    <!-- 5줄 -->
+    <div class="ctrl-row"><span class="ctrl-lbl">B2B 비중 (%)</span><input type="range" id="s-b2b" min="0" max="50" step="1" value="10"><span class="cval" id="v-b2b">10</span></div>
+    <div class="ctrl-row"><span class="ctrl-lbl">B2B 판매가 (CNY/세트)</span><input type="range" id="s-b2bp" min="20" max="300" step="1" value="133"><span class="cval" id="v-b2bp">133</span></div>
+    <!-- 6줄 -->
+    <div class="ctrl-row"><span class="ctrl-lbl">왕홍 판매가 (CNY)</span><input type="range" id="s-whp" min="100" max="600" step="1" value="289"><span class="cval" id="v-whp">289</span></div>
+    <div class="ctrl-row"><span class="ctrl-lbl">티몰 판매가 (CNY)</span><input type="range" id="s-tmp" min="100" max="700" step="1" value="378"><span class="cval" id="v-tmp">378</span></div>
+  </div>
+  <button class="reset-btn" onclick="resetAll()">초기화</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DEF={prod:100000,fx:210,cogs:400,set:30,comm:60,tmktg:20,wh:80,tmall:20,b2b:10,b2bp:133,whp:289,tmp:378};
+const IDS=['prod','fx','cogs','set','comm','tmktg','wh','tmall','b2b','b2bp','whp','tmp'];
+
+function gv(k){return parseFloat(document.getElementById('s-'+k).value)}
+function fk(n){return Math.round(n).toLocaleString('ko-KR')}
+
+function calc(){
+  const prod=gv('prod'),fx=gv('fx'),cogs=gv('cogs'),setSize=gv('set');
+  const comm=gv('comm')/100,tmktg=gv('tmktg')/100;
+  const whPct=gv('wh')/100;
+  const b2bPct=gv('b2b')/100,b2bPrice=gv('b2bp');
+  const whPrice=gv('whp'),tmPrice=gv('tmp');
+
+  const totalSets=Math.floor(prod/setSize);
+  const b2bSets=Math.round(totalSets*b2bPct);
+  const b2cSets=totalSets-b2bSets;
+  const whSets=Math.round(b2cSets*whPct);
+  const tmSets=b2cSets-whSets;
+
+  const platR=0.04,taxR_wh=0.033,ship=8,tpR_wh=0.05;
+  const taxR_tm=0.091,tpR_tm=0.10;
+
+  const whRevKRW=whSets*whPrice*fx;
+  const whCostPerSet=whPrice*(platR+comm+taxR_wh+tpR_wh)*fx + setSize*cogs + ship*fx;
+  const whCostKRW=whCostPerSet*whSets;
+  const whProfit=whRevKRW-whCostKRW;
+
+  const tmRevKRW=tmSets*tmPrice*fx;
+  const tmCostPerSet=tmPrice*(platR+tmktg+taxR_tm+tpR_tm)*fx + setSize*cogs + ship*fx;
+  const tmCostKRW=tmCostPerSet*tmSets;
+  const tmProfit=tmRevKRW-tmCostKRW;
+
+  const b2bRevKRW=b2bSets*b2bPrice*fx;
+  const b2bCostKRW=b2bSets*setSize*cogs;
+  const b2bProfit=b2bRevKRW-b2bCostKRW;
+
+  const totalRev=whRevKRW+tmRevKRW+b2bRevKRW;
+  const totalCost=whCostKRW+tmCostKRW+b2bCostKRW;
+  const totalProfit=whProfit+tmProfit+b2bProfit;
+
+  return {
+    rows:[
+      {name:'왕홍',sets:whSets,rev:whRevKRW,cost:whCostKRW,profit:whProfit},
+      {name:'티몰',sets:tmSets,rev:tmRevKRW,cost:tmCostKRW,profit:tmProfit},
+      {name:'B2B',sets:b2bSets,rev:b2bRevKRW,cost:b2bCostKRW,profit:b2bProfit},
+    ],
+    total:{sets:totalSets,rev:totalRev,cost:totalCost,profit:totalProfit}
+  };
+}
+
+let myChart=null;
+function initChart(){
+  const ctx=document.getElementById('ch').getContext('2d');
+  myChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:['왕홍','티몰','B2B'],
+      datasets:[
+        {label:'매출액',data:[0,0,0],backgroundColor:'rgba(90,159,212,0.75)',borderColor:'#5a9fd4',borderWidth:1,borderRadius:2},
+        {label:'순이익',data:[0,0,0],backgroundColor:'rgba(74,170,114,0.75)',borderColor:'#4aaa72',borderWidth:1,borderRadius:2}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:'#778',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'#2a2a44'}},
+        y:{ticks:{color:'#778',font:{size:10},callback:v=>{
+          if(Math.abs(v)>=1e8)return (v/1e8).toFixed(0)+'억';
+          if(Math.abs(v)>=1e6)return (v/1e6).toFixed(0)+'M';
+          return v;
+        }},grid:{color:'rgba(255,255,255,0.06)'},border:{color:'#2a2a44'}}
+      }
+    }
+  });
+}
+
+function render(){
+  const d=calc();
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+  d.rows.forEach(r=>{
+    const m=r.rev>0?((r.profit/r.rev)*100).toFixed(1):0;
+    const pc=r.profit>=0?'color:#4aaa72':'color:#e07060';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="lbl">${r.name}</td><td>${fk(r.sets)}</td><td>${fk(r.rev)}</td><td>${fk(r.cost)}</td><td style="${pc}">${fk(r.profit)}</td><td>${m}%</td>`;
+    tbody.appendChild(tr);
+  });
+  const t=d.total;
+  const tm=t.rev>0?((t.profit/t.rev)*100).toFixed(1):0;
+  const trT=document.createElement('tr');
+  trT.className='total-row';
+  trT.innerHTML=`<td class="lbl">합계</td><td>${fk(t.sets)}</td><td>${fk(t.rev)}</td><td>${fk(t.cost)}</td><td>${fk(t.profit)}</td><td>${tm}%</td>`;
+  tbody.appendChild(trT);
+
+  document.getElementById('kpi-rev').textContent=fk(t.rev)+' KRW';
+  document.getElementById('kpi-profit').textContent=fk(t.profit)+' KRW';
+  document.getElementById('kpi-margin').textContent=tm+'%';
+
+  if(myChart){
+    myChart.data.datasets[0].data=d.rows.map(r=>r.rev);
+    myChart.data.datasets[1].data=d.rows.map(r=>r.profit);
+    myChart.update('none');
+  }
+}
+
+IDS.forEach(k=>{
+  document.getElementById('s-'+k).addEventListener('input',function(){
+    document.getElementById('v-'+k).textContent=this.value;
+    render();
+  });
+});
+
+function resetAll(){
+  IDS.forEach(k=>{
+    document.getElementById('s-'+k).value=DEF[k];
+    document.getElementById('v-'+k).textContent=DEF[k];
+  });
+  render();
+}
+
+initChart();
+render();
+</script>
+</body>
+</html>
